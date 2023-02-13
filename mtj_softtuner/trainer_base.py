@@ -2,7 +2,7 @@ from . import patch
 from . import core
 from . import exceptions
 from . import serialization
-from . import visualization
+# from . import visualization
 from .kobold import torch_lazy_loader
 
 import abc
@@ -784,24 +784,25 @@ class TrainerBase(abc.ABC):
             if not hide_compiling_spinner:
                 spinner.terminate()
             # Show the plots for learning rate, etc.
-            visualization.show_plots()
+            self.chart_data = []
+            self.chart_noise_data = []
             # Update plot
-            visualization.push_data(
+            self.chart_data.append((
                 step,
                 scheduler(step),
                 loss,
                 last_loss,
                 grad_norm,
                 grad_norm_micro,
-            )
+            ))
             if g_avg is not False:
                 b_simple, g_avg, s_avg = compute_noise(g_avg, s_avg)
-                visualization.push_noise_data(
+                self.chart_noise_data.append((
                     step,
                     b_simple,
                     g_avg,
                     s_avg,
-                )
+                ))
         # Create a save file for step 1
         if step == 1 or step % self.data.stparams["save_every"] == 0:
             save_mtjsp(
@@ -819,22 +820,22 @@ class TrainerBase(abc.ABC):
             step += 1
             # Train for one step and update the plot
             loss, last_loss, grad_norm, grad_norm_micro = train_step(use_tqdm=True)
-            visualization.push_data(
+            self.chart_data.append((
                 step,
                 scheduler(step),
                 loss,
                 last_loss,
                 grad_norm,
                 grad_norm_micro,
-            )
+            ))
             if g_avg is not False:
                 b_simple, g_avg, s_avg = compute_noise(g_avg, s_avg)
-                visualization.push_noise_data(
+                self.chart_noise_data.append((
                     step,
                     b_simple,
                     g_avg,
                     s_avg,
-                )
+                ))
             # Save whenever step is divisible by save_every
             if step % self.data.stparams["save_every"] == 0:
                 save_mtjsp(
