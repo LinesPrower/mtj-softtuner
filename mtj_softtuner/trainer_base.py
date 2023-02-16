@@ -253,6 +253,7 @@ class TrainerBase(abc.ABC):
         epochs=1,
         use_ftfy=True,
         shuffle_seed: Optional[Union[int, float, str, bytes, bytearray]] = 1729,
+        shift_data=False
     ):
         dataset_path = dataset_path.replace("\\", "/")
         output_file = output_file.replace("\\", "/")
@@ -330,21 +331,33 @@ class TrainerBase(abc.ABC):
             print(
                 f"We're removing the last {tail} tokens from your dataset to make the length a multiple of {batch_size+1}."
             )
-            tokens = tokens[:-tail]
+            tokens_trimmed = tokens[:-tail]
 
-        tokens = np.array(tokens, dtype=np.uint16).reshape((-1, batch_size + 1))
-        sequences_per_epoch = tokens.shape[0]
+        btokens = np.array(tokens_trimmed, dtype=np.uint16).reshape((-1, batch_size + 1))
+        sequences_per_epoch = btokens.shape[0]
         _epochs = math.ceil(epochs)
         if _epochs > 1:
             rng = np.random.Generator(np.random.PCG64(1729))
-            tokens = np.concatenate(
-                (
-                    tokens,
-                    *(rng.permutation(tokens, axis=0) for i in range(_epochs - 1)),
-                ),
-                axis=0,
-            )
-        tokens = tokens[: math.ceil(epochs * sequences_per_epoch)]
+            if shift_data:
+                add_data = []
+                for i in range(_epochs - 1):
+                    offset = (batch_size + 1) * (i + 1) // _epochs
+                    tokens_trimmed = tokens[offset:]
+                    tail = len(tokens_trimmed) % (batch_size + 1)
+                    if tail > 0:
+                        tokens_trimmed = tokens_trimmed[:-tail]
+                    tokens_trimmed = np.array(tokens_trimmed, dtype=np.uint16).reshape((-1, batch_size + 1))
+                    add_data.append(rng.permutation(tokens_trimmed, axis=0))
+                btokens = np.concatenate((btokens, *add_data), axis=0)
+            else:
+                btokens = np.concatenate(
+                    (
+                        btokens,
+                        *(rng.permutation(btokens, axis=0) for i in range(_epochs - 1)),
+                    ),
+                    axis=0,
+                )
+        tokens = btokens[: math.ceil(epochs * sequences_per_epoch)]
         print(f"Total sequences in your dataset: {tokens.shape[0]}")
 
         if isinstance(output_file, str):
