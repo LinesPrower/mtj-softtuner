@@ -245,6 +245,102 @@ class TrainerBase(abc.ABC):
                 f,
             )
 
+    def tokenize_dialogue(
+        self,
+        input_file: Union[str, TextIO],
+        output_file: Union[str, TextIO],
+        batch_size=2048,
+        use_ftfy=True
+    ):
+        input_file = input_file.replace("\\", "/")
+        output_file = output_file.replace("\\", "/")
+        if not isinstance(batch_size, int) or batch_size < 1:
+            self.raise_configuration_error(
+                "batch_size must be an integer greater than zero.", code=9
+            )
+        if isinstance(output_file, str) and output_file.endswith("/"):
+            self.raise_configuration_error(
+                "output_file should be the path to a file, not a directory.", code=11
+            )
+        if isinstance(input_file, str) and not os.path.isfile(input_file):
+            self.raise_configuration_error(
+                "input_file should be the path to a file.", code=12
+            )
+
+        tokenizer = self.get_tokenizer()
+
+        batch_size = min(
+            batch_size,
+            self.data.params["max_batch_size"] - self.data.soft_in_dim,
+        )
+        assert batch_size >= 0
+        print(
+            termcolor.colored(
+                "\nIf you see a warning somewhere below about token indices, ignore it.  That warning is normal.\n",
+                "magenta",
+            )
+        )
+        print("Batch size:", batch_size)
+        print(termcolor.colored("Tokenizing your dataset...\n", "magenta"))
+
+        prefix = '<START>'
+        prefix = self.tokenize_dataset_callback(tokenizer, prefix)
+        replies = []
+
+        if isinstance(input_file, str):
+            f = open(input_file)
+        else:
+            f = input_file
+        try:
+            text = f.read()
+            items = json.loads(text)
+            for e in items:
+                s = e['text']
+                if use_ftfy:
+                    s = ftfy.fix_text(s)
+                #s = s.replace("<|endoftext|>", eos)
+                replies.append(self.tokenize_dataset_callback(tokenizer, '\n' + text))
+        finally:
+            if isinstance(input_file, str):
+                f.close()
+
+        tokens = []
+        for i in range(len(replies)):
+            tmp = list(prefix)
+            for j in range(i, len(replies)):
+                tmp.extend(replies[j])
+                if len(tmp) > batch_size + 1:
+                    break
+            if len(tmp) < batch_size + 1:
+                break
+            tokens.extend(tmp[:batch_size + 1])
+
+        print("Dataset size (in tokens):", len(tokens))
+        if len(tokens) < batch_size + 1:
+            self.raise_configuration_error(
+                "Your dataset is too small!",
+                code=13,
+            )
+        assert len(tokens) % (batch_size + 1) == 0
+
+        btokens = np.array(tokens, dtype=np.uint16).reshape((-1, batch_size + 1))
+        rng = np.random.Generator(np.random.PCG64(1729))
+        tokens = rng.permutation(btokens, axis=0)
+
+        print(f"Total sequences in your dataset: {tokens.shape[0]}")
+
+        if isinstance(output_file, str):
+            f = open(output_file, "w")
+        else:
+            f = output_file
+        try:
+            np.save(output_file, tokens)
+        finally:
+            if isinstance(output_file, str):
+                f.close()
+
+        self.save_data()
+
     def tokenize_dataset(
         self,
         dataset_path: Union[str, TextIO],
