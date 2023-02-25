@@ -300,8 +300,8 @@ class TrainerBase(abc.ABC):
                 if use_ftfy:
                     s = ftfy.fix_text(s)
                 #s = s.replace("<|endoftext|>", eos)
-                t = self.tokenize_dataset_callback(tokenizer, '\n' + text)[:-1]
-                print('reply: %d tokens' % len(t))
+                t = self.tokenize_dataset_callback(tokenizer, '\n' + s)[:-1]
+                # print('reply: %d tokens' % len(t))
                 replies.append(t)
         finally:
             if isinstance(input_file, str):
