@@ -284,7 +284,8 @@ class TrainerBase(abc.ABC):
         print(termcolor.colored("Tokenizing your dataset...\n", "magenta"))
 
         prefix = '<START>'
-        prefix = self.tokenize_dataset_callback(tokenizer, prefix)
+        prefix = self.tokenize_dataset_callback(tokenizer, prefix)[:-1] # remove eos
+        print('prefix is %d tokens' % len(prefix))
         replies = []
 
         if isinstance(input_file, str):
@@ -299,7 +300,9 @@ class TrainerBase(abc.ABC):
                 if use_ftfy:
                     s = ftfy.fix_text(s)
                 #s = s.replace("<|endoftext|>", eos)
-                replies.append(self.tokenize_dataset_callback(tokenizer, '\n' + text))
+                t = self.tokenize_dataset_callback(tokenizer, '\n' + text)[:-1]
+                print('reply: %d tokens' % len(t))
+                replies.append(t)
         finally:
             if isinstance(input_file, str):
                 f.close()
