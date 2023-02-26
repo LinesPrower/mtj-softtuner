@@ -250,6 +250,7 @@ class TrainerBase(abc.ABC):
         input_file: Union[str, TextIO],
         output_file: Union[str, TextIO],
         batch_size=2048,
+        epochs=1,
         use_ftfy=True
     ):
         input_file = input_file.replace("\\", "/")
@@ -328,7 +329,8 @@ class TrainerBase(abc.ABC):
 
         btokens = np.array(tokens, dtype=np.uint16).reshape((-1, batch_size + 1))
         rng = np.random.Generator(np.random.PCG64(1729))
-        tokens = rng.permutation(btokens, axis=0)
+        epochs = math.ceil(epochs)
+        tokens = np.concatenate([rng.permutation(btokens, axis=0) for _ in range(epochs)], axis=0)
 
         print(f"Total sequences in your dataset: {tokens.shape[0]}")
 
