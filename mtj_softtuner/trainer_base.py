@@ -903,7 +903,7 @@ class TrainerBase(abc.ABC):
             # Update plot
             self.chart_data.append((
                 step,
-                scheduler(step),
+                float(scheduler(step)),
                 loss,
                 last_loss,
                 grad_norm,
@@ -936,7 +936,7 @@ class TrainerBase(abc.ABC):
             loss, last_loss, grad_norm, grad_norm_micro = train_step(use_tqdm=True)
             self.chart_data.append((
                 step,
-                scheduler(step),
+                float(scheduler(step)),
                 loss,
                 last_loss,
                 grad_norm,
